@@ -3,7 +3,7 @@
 ## 📖 Overview
 
 <div align="center">
-  <img src="assets/pipeline.png"/>
+  <img src="assets/pipeline.png"/ width="800">
 </div><br/>
 
 ## 🛠️ Installation
@@ -95,7 +95,7 @@ python evaluate.py --config_path eval_output/waymo_reconstruction/022_stage2/con
 ## Static-Dynamic Decomposition
 
 <div align="center">
-  <img src="assets/separation.png"/>
+  <img src="assets/separation.png" width="800"/>
 </div><br/>
 
 
@@ -140,5 +140,5 @@ cd ${SIBR_FOLDER}/SIBR_viewers/install/bin
 ### Visualization Results
 
 <div align="center">
-  <img src="assets/qualitative_comp.png"/>
+  <img src="assets/qualitative_comp.png" width="800"/>
 </div><br/>
