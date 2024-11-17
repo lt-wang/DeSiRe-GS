@@ -34,7 +34,7 @@ We test our code on Ubuntu 20.04 using Python 3.10 and PyTorch 2.2.0. We recomme
 
 ```
 # Clone the repo.
-git clone https://github.com/PholyPeng/DeSiRe-GS.git
+git clone https://github.com/chengweialan/DeSiRe-GS.git
 cd DeSiRe-GS
 
 # Create the conda environment.
