@@ -141,6 +141,30 @@ The decomposition results will be saved in `${MODEL_PATH}/separation`
 ![Decomposition](./assets/combined_video.gif)
 
 
+<table>
+  <tr>
+    <td>
+      <p align="center" style="writing-mode: vertical-rl; transform: rotate(180deg);">
+        Rendered Image
+      </p>
+    </td>
+    <td>
+      <img src="./assets/combined_render.gif" alt="Rendered Image" width="400">
+    </td>
+  </tr>
+  <tr>
+    <td>
+      <p align="center" style="writing-mode: vertical-rl; transform: rotate(180deg);">
+        Decomposition
+      </p>
+    </td>
+    <td>
+      <img src="./assets/combined_video.gif" alt="Decomposition" width="400">
+    </td>
+  </tr>
+</table>
+
+
 
 
 
