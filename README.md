@@ -166,7 +166,7 @@ The decomposition results will be saved in `${MODEL_PATH}/separation`
       </p>
     </td>
     <td>
-      <img src="./assets/combined_depth.gif" alt="Rendered Depth" width="100%">
+      <img src="./assets/depth.gif" alt="Rendered Depth" width="100%">
     </td>
   </tr>
   <tr>
