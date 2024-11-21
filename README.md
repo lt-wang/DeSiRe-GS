@@ -152,11 +152,31 @@ The decomposition results will be saved in `${MODEL_PATH}/separation`
   <tr>
     <td>
       <p align="center" style="writing-mode: vertical-rl; transform: rotate(180deg);">
-        Decomposition
+        Decomposed Static
       </p>
     </td>
     <td>
       <img src="./assets/combined_video.gif" alt="Decomposition" width="100%">
+    </td>
+  </tr>
+  <tr>
+    <td>
+      <p align="center" style="writing-mode: vertical-rl; transform: rotate(180deg);">
+        Rendered Depth
+      </p>
+    </td>
+    <td>
+      <img src="./assets/combined_depth.gif" alt="Rendered Depth" width="100%">
+    </td>
+  </tr>
+  <tr>
+    <td>
+      <p align="center" style="writing-mode: vertical-rl; transform: rotate(180deg);">
+        Rendered Normal
+      </p>
+    </td>
+    <td>
+      <img src="./assets/combined_normal.gif" alt="Rendered Normal" width="100%">
     </td>
   </tr>
 </table>
