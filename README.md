@@ -202,7 +202,7 @@ cd ${SIBR_FOLDER}/SIBR_viewers/install/bin
 @article{peng2024desiregs,
   title={DeSiRe-GS: 4D Street Gaussians for Static-Dynamic Decomposition and Surface Reconstruction for Urban Driving Scenes},
   author={Peng, Chensheng and Zhang, Chengwei and Wang, Yixiao and Xu, Chenfeng and Xie, Yichen and Zheng, Wenzhao and Keutzer, Kurt and Tomizuka, Masayoshi and Zhan, Wei},
-  journal={arXiv:},
+  journal={arXiv:2411.11921},
   year={2024},
 }
 ```
