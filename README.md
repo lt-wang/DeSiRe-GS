@@ -149,7 +149,7 @@ The decomposition results will be saved in `${MODEL_PATH}/separation`
       </p>
     </td>
     <td>
-      <img src="./assets/combined_render.gif" alt="Rendered Image" width="400">
+      <img src="./assets/combined_render.gif" alt="Rendered Image" width="100%">
     </td>
   </tr>
   <tr>
@@ -159,7 +159,7 @@ The decomposition results will be saved in `${MODEL_PATH}/separation`
       </p>
     </td>
     <td>
-      <img src="./assets/combined_video.gif" alt="Decomposition" width="400">
+      <img src="./assets/combined_video.gif" alt="Decomposition" width="100%">
     </td>
   </tr>
 </table>
