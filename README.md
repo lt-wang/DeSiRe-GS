@@ -139,7 +139,26 @@ The decomposition results will be saved in `${MODEL_PATH}/separation`
 
 <div class="alert alert-info">
 <p align="center">
-  <img src="./assets/separation.png" alt="separation" width="800" />
+  <table>
+    <tr>
+      <td valign="top">
+        <b>Rendered Image</b><br>
+        <video width="320" controls>
+          <source src="./assets/combined_render.mp4" type="video/mp4">
+          Your browser does not support the video tag.
+        </video>
+      </td>
+    </tr>
+    <tr>
+      <td valign="top">
+        <b>Decomposition</b><br>
+        <video height="320" controls>
+          <source src="./assets/combined_video.mp4" type="video/mp4">
+          Your browser does not support the video tag.
+        </video>
+      </td>
+    </tr>
+  </table>
 </p>
 </div>
 
