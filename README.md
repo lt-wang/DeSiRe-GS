@@ -137,7 +137,8 @@ python separate.py --config_path eval_output/waymo_reconstruction/022_stage2/con
 
 The decomposition results will be saved in `${MODEL_PATH}/separation`
 
-
+![Rendered Image](./assets/combined_render.gif)
+![Decomposition](./assets/combined_video.gif)
 
 
 
