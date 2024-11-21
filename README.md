@@ -137,30 +137,7 @@ python separate.py --config_path eval_output/waymo_reconstruction/022_stage2/con
 
 The decomposition results will be saved in `${MODEL_PATH}/separation`
 
-<div class="alert alert-info">
-  <p align="center">
-    <table>
-      <tr>
-        <td valign="top">
-          <b>Rendered Image</b><br>
-          <video width="100%" controls>
-            <source src="./assets/combined_render.mp4" type="video/mp4">
-            Your browser does not support the video tag.
-          </video>
-        </td>
-      </tr>
-      <tr>
-        <td valign="top">
-          <b>Decomposition</b><br>
-          <video width="100%" controls>
-            <source src="./assets/combined_video.mp4" type="video/mp4">
-            Your browser does not support the video tag.
-          </video>
-        </td>
-      </tr>
-    </table>
-  </p>
-</div>
+
 
 
 
