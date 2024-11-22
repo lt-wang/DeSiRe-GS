@@ -72,7 +72,7 @@ Create a directory to save the data. Run ```mkdir dataset```.
 
 ### Waymo Dataset
 
-We provide following subsets from Waymo Open Dataset. Click [here] for data preprocessing details.
+We provide following subsets from Waymo Open Dataset.
 
 |                     Source                     | Number of Sequences |       Scene Type        | Description                                                  |
 | :--------------------------------------------: | :-----------------: | :---------------------: | ------------------------------------------------------------ |
