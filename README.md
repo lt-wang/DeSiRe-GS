@@ -22,7 +22,7 @@
   <img src="./assets/pipeline.png" alt="pipeline" width="800" />
 </p>
 </div>
-
+In the first stage, we extract 2D motion masks based on the observation that 3D Gaussian Splatting inherently can reconstruct only the static regions in dynamic environments. These extracted 2D motion priors are then mapped into the Gaussian space in a differentiable manner, leveraging an efficient formulation of dynamic Gaussians in the second stage.
 
 
 ## 🛠️ Installation
@@ -70,23 +70,25 @@ pip install ./nvdiffrast
 
 Create a directory to save the data. Run ```mkdir dataset```.
 
-### Waymo Dataset
+We provide a sample sequence in [google drive](https://drive.google.com/drive/u/0/folders/1fHQJy0cq9ofADpCxtlfmpCh6nCpcw-mH), you may download it and unzip it to `dataset`.
+<details>
+<summary>Waymo Dataset</summary>
 
-We provide following subsets from Waymo Open Dataset.
 
 |                     Source                     | Number of Sequences |       Scene Type        | Description                                                  |
 | :--------------------------------------------: | :-----------------: | :---------------------: | ------------------------------------------------------------ |
 |    [PVG](https://github.com/fudan-zvg/PVG)     |          4          |         Dynamic         | • Refer to [this page](https://github.com/fudan-zvg/PVG?tab=readme-ov-file#data-preparation). |
 |    [OmniRe](https://ziyc.github.io/omnire/)    |          8          |         Dynamic         | • Described as highly complex dynamic<br>• Refer to [this page](https://github.com/ziyc/drivestudio/blob/main/docs/Waymo.md). |
 | [EmerNeRF](https://github.com/NVlabs/EmerNeRF) |         64          | 32 dynamic<br>32 static | • Contains 32 static, 32 dynamic and 56 diverse scenes. <br> • We test our code on the 32 static and 32 dynamic scenes. <br> • See [this page](https://github.com/NVlabs/EmerNeRF?tab=readme-ov-file#dataset-preparation) for detailed instructions. |
+</details>
 
-
-### KITTI Dataset
+<details>
+<summary>KITTI Dataset </summary>
 
 |                 Source                  | Number of Sequences | Scene Type | Description                                                  |
 | :-------------------------------------: | :-----------------: | :--------: | ------------------------------------------------------------ |
 | [PVG](https://github.com/fudan-zvg/PVG) |          3          |  Dynamic   | • Refer to [this page](https://github.com/fudan-zvg/PVG?tab=readme-ov-file#kitti-dataset). |
-
+</details>
 
 
 ## :memo:  Training and Evaluation
@@ -99,8 +101,8 @@ First, we use the following command to train for stage I,
 # Stage 1
 python train.py \
 --config configs/emer_reconstruction_stage1.yaml \
-source_path=dataset/022 \
-model_path=eval_output/waymo_reconstruction/022_stage1
+source_path=dataset/084 \
+model_path=eval_output/waymo_reconstruction/084_stage1
 ```
 
 After running the command, the uncertainty model will be saved in ```${YOUR_MODEL_PATH}/uncertainty_model.pth``` by default.
@@ -116,8 +118,10 @@ uncertainty_model_path=eval_output/waymo_reconstruction/084_stage1/uncertainty_m
 
 ### Evaluating
 
+We provide the checkpoints in [google drive](https://drive.google.com/drive/u/0/folders/1fHQJy0cq9ofADpCxtlfmpCh6nCpcw-mH), you may download it and unzip it under `${PROJECT_FOLDER}`
+
 ```sh
-python evaluate.py --config_path eval_output/waymo_reconstruction/022_stage2/config.yaml
+python evaluate.py --config_path eval_output/waymo_reconstruction/084_stage2/config.yaml
 ```
 
 ### Static-Dynamic Decomposition
@@ -132,7 +136,7 @@ For instance,
 
 ```
 # example
-python separate.py --config_path eval_output/waymo_reconstruction/022_stage2/config.yaml
+python separate.py --config_path eval_output/waymo_reconstruction/084_stage2/config.yaml
 ```
 
 The decomposition results will be saved in `${MODEL_PATH}/separation`
@@ -196,7 +200,7 @@ We provide code ```visualize_gs.py``` for gaussian ellipsoids visualization. For
 
 ```
 # Save gaussian point cloud.
-python visualize_gs.py --config_path eval_output/waymo_reconstruction/022_stage2/config.yaml
+python visualize_gs.py --config_path eval_output/waymo_reconstruction/084_stage2/config.yaml
 ```
 
 The ```.ply``` file which contains visible gaussians will be saved in  ```${YOUR_MODEL_PATH}/point_cloud/point_cloud.ply```. You can use SIBR Viewer to visualize the gaussians directly in your model path folder. For example,
@@ -209,7 +213,7 @@ cd ${SIBR_FOLDER}/SIBR_viewers/install/bin
 ./SIBR_gaussianViewer_app -m ${YOUR_MODEL_PATH}/
 
 # Example
-./SIBR_gaussianViewer_app -m ${PROJECT_FOLDER}/eval_output/waymo_reconstruction/022_stage2/
+./SIBR_gaussianViewer_app -m ${PROJECT_FOLDER}/eval_output/waymo_reconstruction/084_stage2/
 ```
 <div class="alert alert-info">
 <p align="center">
@@ -221,10 +225,20 @@ cd ${SIBR_FOLDER}/SIBR_viewers/install/bin
 ## 📜 BibTeX
 
 ```bibtex
-@article{peng2024desiregs,
-  title={DeSiRe-GS: 4D Street Gaussians for Static-Dynamic Decomposition and Surface Reconstruction for Urban Driving Scenes},
-  author={Peng, Chensheng and Zhang, Chengwei and Wang, Yixiao and Xu, Chenfeng and Xie, Yichen and Zheng, Wenzhao and Keutzer, Kurt and Tomizuka, Masayoshi and Zhan, Wei},
-  journal={arXiv:2411.11921},
-  year={2024},
+@misc{peng2024desiregs4dstreetgaussians,
+      title={DeSiRe-GS: 4D Street Gaussians for Static-Dynamic Decomposition and Surface Reconstruction for Urban Driving Scenes}, 
+      author={Chensheng Peng and Chengwei Zhang and Yixiao Wang and Chenfeng Xu and Yichen Xie and Wenzhao Zheng and Kurt Keutzer and Masayoshi Tomizuka and Wei Zhan},
+      year={2024},
+      eprint={2411.11921},
+      archivePrefix={arXiv},
+      primaryClass={cs.CV},
 }
 ```
+
+
+
+
+## :pray: Acknowledgements
+
+We adapted some codes from some awesome repositories including [PVG](https://github.com/fudan-zvg/PVG) and [PGSR](https://github.com/zju3dv/PGSR/).
+

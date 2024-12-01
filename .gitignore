@@ -36,7 +36,8 @@ build/
 
 
 build
-data
+data/
+dataset/
 output
 eval_output
 diff-gaussian-rasterization
