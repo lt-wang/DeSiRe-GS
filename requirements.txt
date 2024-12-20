@@ -21,3 +21,5 @@ albucore
 open3d
 tensorboard
 gdown
+h5py
+pytorch_lightning
