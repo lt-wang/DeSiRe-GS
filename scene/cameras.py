@@ -99,7 +99,8 @@ class Camera(nn.Module):
                                         torch.ones_like(u)], dim=0)
         directions = F.normalize(directions, dim=0)
         directions = (self.c2w[:3, :3] @ directions.reshape(3, -1)).reshape(3, self.image_height, self.image_width)
-        return directions
+        
+        return directions  #[3, H, W]
 
     def get_image(self):
         original_image = self.original_image # [3, H, W]

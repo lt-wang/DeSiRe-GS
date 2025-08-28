@@ -1,0 +1,27 @@
+tqdm
+imageio
+imageio[ffmpeg]
+kornia
+trimesh
+Pillow
+ninja
+omegaconf
+plyfile
+opencv_python>=4.8.0,<4.10.0
+opencv_contrib_python>=4.8.0,<4.10.0
+tensorboardX
+matplotlib
+texttable
+albumentations
+timm==0.9.10
+scikit-learn
+torch-kmeans
+albumentations
+albucore
+open3d
+tensorboard
+gdown
+h5py
+pytorch_lightning
+# Fixed NumPy version to avoid compatibility issues
+numpy>=1.21.0,<2.0

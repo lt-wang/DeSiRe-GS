@@ -1,0 +1,1 @@
+python render_occlusion.py --config_path eval_output/waymo_reconstruction/084_stage2/config.yaml
