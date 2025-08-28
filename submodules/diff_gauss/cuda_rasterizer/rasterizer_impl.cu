@@ -383,6 +383,7 @@ int CudaRasterizer::Rasterizer::lite_forward(
 	const float scale_modifier,
 	const float* rotations,
 	const float* cov3D_precomp,
+	const bool* mask,
 	const float* viewmatrix,
 	const float* projmatrix,
 	const float* cam_pos,
@@ -429,6 +430,7 @@ int CudaRasterizer::Rasterizer::lite_forward(
 		opacities,
 		shs,
 		cov3D_precomp,
+		mask,
 		colors_precomp,
 		viewmatrix,
 		projmatrix,
@@ -535,6 +537,7 @@ int CudaRasterizer::Rasterizer::forward(
 	const float scale_modifier,
 	const float* rotations,			// [P, 4]
 	const float* cov3D_precomp,		// [P, 6]
+	const bool*  mask,
 	const float* viewmatrix,		// [4, 4]
 	const float* projmatrix,		// [4. 4]
 	const float* cam_pos,			// [3]
@@ -591,6 +594,7 @@ int CudaRasterizer::Rasterizer::forward(
 		opacities,
 		shs,
 		cov3D_precomp,
+		mask,
 		colors_precomp,
 		viewmatrix,
 		projmatrix,

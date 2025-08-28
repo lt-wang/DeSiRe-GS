@@ -24,6 +24,7 @@ LiteRasterizeGaussiansCUDA(
 	const torch::Tensor& scales,
 	const torch::Tensor& rotations,
 	const torch::Tensor& cov3D_precomp,
+	const torch::Tensor& mask, //mask
 	const torch::Tensor& sh,
 	const torch::Tensor& campos,
 	const torch::Tensor& viewmatrix,
@@ -51,6 +52,7 @@ RasterizeGaussiansCUDA(
 	const torch::Tensor& scales,
 	const torch::Tensor& rotations,
 	const torch::Tensor& cov3D_precomp,
+	const torch::Tensor& mask, //mask
 	const torch::Tensor& sh,
 	const torch::Tensor& campos,
 	const torch::Tensor& viewmatrix,

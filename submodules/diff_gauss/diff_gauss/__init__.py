@@ -67,6 +67,7 @@ class _RasterizeGaussians(torch.autograd.Function):
         scales: torch.Tensor,
         rotations: torch.Tensor,
         cov3Ds_precomp: torch.Tensor,
+        mask: torch.Tensor,
         raster_settings: GaussianRasterizationSettings,
     ) -> Tuple[
         torch.Tensor,
@@ -93,6 +94,7 @@ class _RasterizeGaussians(torch.autograd.Function):
             scales,
             rotations,
             cov3Ds_precomp,
+            mask, ##mask
             sh,
             raster_settings.campos,
             raster_settings.viewmatrix,
@@ -403,6 +405,7 @@ class GaussianRasterizer(nn.Module):
         cov3D_precomp: Optional[torch.Tensor] = None,
         derive_normal: bool = True,
         sun_dir: Optional[torch.Tensor] = torch.tensor([0.1, 0.5, 0.4]),
+        mask: Optional[torch.Tensor] = None
     ) -> Tuple[
         torch.Tensor,
         torch.Tensor,
@@ -444,8 +447,8 @@ class GaussianRasterizer(nn.Module):
         if cov3D_precomp is None:
             cov3D_precomp = torch.Tensor([])
 
-        # if mask is None:
-        #     mask = torch.ones_like(means3D[:, :1], dtype=torch.bool)
+        if mask is None:
+            mask = torch.ones_like(means3D[:, :1], dtype=torch.bool)
         # Invoke C++/CUDA rasterization routine
         (
             color,
@@ -471,6 +474,7 @@ class GaussianRasterizer(nn.Module):
             scales,
             rotations,
             cov3D_precomp,
+            mask, #mask
             raster_settings,
         )
         # torch.backends.cudnn.benchmark = True

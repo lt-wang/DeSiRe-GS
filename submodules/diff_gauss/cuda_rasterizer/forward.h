@@ -50,6 +50,7 @@ namespace FORWARD
 		const float* opacities,
 		const float* shs,
 		const float* cov3D_precomp,
+		const bool* mask,
 		const float* colors_precomp,
 		const float* viewmatrix,
 		const float* projmatrix,

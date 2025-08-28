@@ -171,6 +171,7 @@ __global__ void preprocessCUDA(
 	const float* opacities,
 	const float* shs,
 	const float* cov3D_precomp,
+	const bool* mask,
 	const float* colors_precomp,
 	const float* viewmatrix,
 	const float* projmatrix,
@@ -205,10 +206,10 @@ __global__ void preprocessCUDA(
 	
 
 	//添加  mask去除
-	// if (!(mask[idx]) || !in_frustum(idx, orig_points, viewmatrix, projmatrix, prefiltered, p_view))
-	// 	return;
-	if (!in_frustum(idx, orig_points, viewmatrix, projmatrix, prefiltered, p_view))
+	if (!(mask[idx]) || !in_frustum(idx, orig_points, viewmatrix, projmatrix, prefiltered, p_view))
 		return;
+	// if (!in_frustum(idx, orig_points, viewmatrix, projmatrix, prefiltered, p_view))
+	// 	return;
 
 	// Transform point by projecting
 	const float3 p_orig = { orig_points[3 * idx], orig_points[3 * idx + 1], orig_points[3 * idx + 2] };
@@ -1209,6 +1210,7 @@ void FORWARD::preprocess(
 	const float* opacities,
 	const float* shs,
 	const float* cov3D_precomp,
+	const bool* mask,
 	const float* colors_precomp,
 	const float* viewmatrix,
 	const float* projmatrix,
@@ -1238,6 +1240,7 @@ void FORWARD::preprocess(
 		opacities,
 		shs,
 		cov3D_precomp,
+		mask,
 		colors_precomp,
 		viewmatrix, 
 		projmatrix,
