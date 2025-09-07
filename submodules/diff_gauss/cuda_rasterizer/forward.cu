@@ -792,6 +792,96 @@ SunShadowCUDA(
 
     occlusion[pix_id] = 1.0f - occluded; // 1 表示无遮挡，0 表示被遮挡
 }
+// __global__ void __launch_bounds__(BLOCK_X * BLOCK_Y)
+// SunShadowCUDA(
+//     int W, int H,
+//     const float focal_x,
+//     const float focal_y,
+// 	const float radius,   // 光线采样半径
+// 	const float bias,     // 阴影偏移
+// 	const float thick,    // 阴影厚度
+// 	const float delta,    // 步进（未直接使用，可保留占位）
+// 	const int step,       // 采样步数
+// 	const int start,      // 起始步
+// 	const float* __restrict__ sun_dir, // [3], 单位向量，太阳方向
+// 	const float* __restrict__ out_normal,
+// 	const float* __restrict__ out_pos,
+//     float* __restrict__ occlusion) 
+// {
+//     auto block = cg::this_thread_block();
+//     uint2 pix_min = { block.group_index().x * BLOCK_X, block.group_index().y * BLOCK_Y };
+//     uint2 pix = { pix_min.x + block.thread_index().x, pix_min.y + block.thread_index().y };
+//     uint32_t pix_id = W * pix.y + pix.x;
+
+//     if (pix.x >= W || pix.y >= H) return;
+
+//     // 当前像素位置
+// 	float3 pos = make_float3(
+// 		out_pos[pix_id],
+// 		out_pos[H*W + pix_id],
+// 		out_pos[2*H*W + pix_id]
+// 	);
+
+//     // 当前像素法线
+//     float3 normal = make_float3(
+//         out_normal[pix_id],
+//         out_normal[H*W + pix_id],
+//         out_normal[2*H*W + pix_id]
+//     );
+
+//     // 将 float* 转为 float3，便于后续使用
+//     float3 sunDir = make_float3(sun_dir[0], sun_dir[1], sun_dir[2]);
+
+//     // ********** 法线向量优化：背光面检查 **********
+//     // 计算法线与太阳方向的点积
+//     float dot_product = dot(normal, sunDir);
+    
+//     // 点积 < 0 表示表面背向光源，直接标记为阴影
+//     if (dot_product < 0.0f) {
+//         occlusion[pix_id] = 0.0f;  // 直接设置为阴影
+//         return;  // 跳过后续采样计算
+//     }
+    
+//     // 接近边缘的情况添加小阈值，避免精度问题
+//     const float threshold = 0.001f;
+//     if (dot_product < threshold) {
+//         occlusion[pix_id] = 0.0f;
+//         return;
+//     }
+//     // *****************************************
+
+//     float occluded = 0.0f;
+//     float cx = float(W) / 2.0f;
+//     float cy = float(H) / 2.0f;
+
+//     // 沿太阳光方向步进采样
+//     for (int j = start; j < step; ++j)
+//     {
+//         float scale = j * radius / step;
+//         float3 samplePos = make_float3(
+//             pos.x + sunDir.x * scale,
+//             pos.y + sunDir.y * scale,
+//             pos.z + sunDir.z * scale
+//         );
+
+//         int2 depth_id = get_coord(cx, cy, focal_x, focal_y, samplePos);
+
+//         // 屏幕范围检查
+//         if (depth_id.x < 0 || depth_id.x >= W || depth_id.y < 0 || depth_id.y >= H)
+//             break;
+
+//         float sampleDepth = out_pos[2*H*W + depth_id.y * W + depth_id.x];
+
+//         if (sampleDepth <= samplePos.z + bias && sampleDepth >= samplePos.z - thick)
+//         {
+//             occluded = 1.0f; // 阴影被遮挡
+//             break;
+//         }
+//     }
+
+//     occlusion[pix_id] = 1.0f - occluded; // 1 表示无遮挡，0 表示被遮挡
+// }
+
 
 __global__ void __launch_bounds__(BLOCK_X * BLOCK_Y)
 SSRCUDA(

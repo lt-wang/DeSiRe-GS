@@ -12,18 +12,17 @@
 """
 PVG渲染器模块 - 用于DeSiRe-GS（动态场景重建）的高斯散点渲染
 包含渲染函数、损失计算和多视角几何一致性约束
-
-+++ GI-GS
-
 """
 
 import torch
 import math
-from diff_gauss import (
+from diff_gaussian_rasterization import (
     GaussianRasterizationSettings,  # 高斯栅格化设置
     GaussianRasterizer,            # 高斯栅格化器
 )
-
+from diff_gaussian_rasterization._C import SSAO, SunShadow,depth_to_normal
+# from . import _C
+import kornia
 from scene.gaussian_model import GaussianModel     # 高斯散点模型
 from scene.dynamic_model import scale_grads        # 动态模型梯度缩放
 from scene.cameras import Camera                   # 相机模型
@@ -40,7 +39,7 @@ import os
 EPS = 1e-5  # 数值稳定性常数
 
 
-def render_occ(
+def render_shadow(
     viewpoint_camera: Camera,      # 视点相机
     pc: GaussianModel,             # 高斯散点云模型
     pipe,                          # 渲染管线参数
@@ -52,13 +51,13 @@ def render_occ(
     other=[],                      # 其他特征
     mask=None,                     # 遮罩
     is_training=False,             # 是否为训练模式
-    return_depth_normal=False,     # 是否返回深度法向量
+    return_depth_normal=True,     # 是否返回深度法向量
     radius: float = 0.8,
     bias: float = 0.01,
     thick: float = 0.05,
     delta: float = 0.0625,
     # step: int = 16,
-    step: int = 100,
+    step: int = 16,
     start: int = 8
 ):
     """
@@ -98,42 +97,28 @@ def render_occ(
     tanfovy = math.tan(viewpoint_camera.FoVy * 0.5)  # 垂直视场角的正切值
 
     # 创建高斯栅格化设置对象
-    # raster_settings = GaussianRasterizationSettings(
-    #     image_height=int(viewpoint_camera.image_height),           # 图像高度
-    #     image_width=int(viewpoint_camera.image_width),             # 图像宽度
-    #     tanfovx=tanfovx,                                          # 水平视场角正切值
-    #     tanfovy=tanfovy,                                          # 垂直视场角正切值
-    #     bg=bg_color if env_map is not None else torch.zeros(3, device="cuda"),  # 背景颜色
-    #     scale_modifier=scaling_modifier,                           # 尺度修饰器
-    #     viewmatrix=viewpoint_camera.world_view_transform,          # 世界到视图变换矩阵
-    #     projmatrix=viewpoint_camera.full_proj_transform,           # 完整投影变换矩阵
-    #     sh_degree=pc.active_sh_degree,                            # 活跃的球谐函数度数
-    #     campos=viewpoint_camera.camera_center,                     # 相机中心位置
-    #     prefiltered=False,                                        # 是否预过滤
-    #     debug=pipe.debug,                                         # 调试模式
-    # )
     raster_settings = GaussianRasterizationSettings(
-        image_height=int(viewpoint_camera.image_height),
-        image_width=int(viewpoint_camera.image_width),
-        tanfovx=tanfovx,
-        tanfovy=tanfovy,
+        image_height=int(viewpoint_camera.image_height),           # 图像高度
+        image_width=int(viewpoint_camera.image_width),             # 图像宽度
+        tanfovx=tanfovx,                                          # 水平视场角正切值
+        tanfovy=tanfovy,                                          # 垂直视场角正切值
+        bg=bg_color if env_map is not None else torch.zeros(3, device="cuda"),  # 背景颜色
+        scale_modifier=scaling_modifier,                           # 尺度修饰器
+        viewmatrix=viewpoint_camera.world_view_transform,          # 世界到视图变换矩阵
+        projmatrix=viewpoint_camera.full_proj_transform,           # 完整投影变换矩阵
+        sh_degree=pc.active_sh_degree,                            # 活跃的球谐函数度数
+        campos=viewpoint_camera.camera_center,                     # 相机中心位置
+        prefiltered=False,                                        # 是否预过滤
+        debug=pipe.debug,    
+        ##                                                                          # 调试模式
         radius=radius,
         bias=bias,
         thick=thick,
         delta=delta,
         step=step,
         start=start,
-        bg=bg_color,
-        scale_modifier=scaling_modifier,
-        viewmatrix=viewpoint_camera.world_view_transform,
-        projmatrix=viewpoint_camera.full_proj_transform,
-        sh_degree=pc.active_sh_degree,
-        campos=viewpoint_camera.camera_center,
-        prefiltered=False,
-        debug=pipe.debug,
-        inference=False,
-        argmax_depth=False,
     )
+
     rasterizer = GaussianRasterizer(raster_settings=raster_settings)  # 创建栅格化器
 
     # 初始化高斯散点的基本属性
@@ -197,10 +182,10 @@ def render_occ(
     # TODO: MOVE TO MASKED MEANS3D
     # 计算法向量 - 从高斯散点的尺度和旋转得到
     # normals = pc.get_normal(viewpoint_camera.c2w, means3D, from_scaling=False)
-    normal_global = pc.get_normal_v2(viewpoint_camera, means3D)
+    normals = pc.get_normal_v2(viewpoint_camera, means3D)
     # 将法向量转换到相机坐标系
 
-    normals = normal_global @ viewpoint_camera.world_view_transform[:3, :3]
+    # normals = normals @ viewpoint_camera.world_view_transform[:3, :3]
 
     # 处理其他特征
     if len(feature_list) > 0:
@@ -210,11 +195,21 @@ def render_occ(
         features = torch.zeros_like(means3D[:, :0])  # 空特征张量
         S_other = 0
 
+        # 我们假设海拔>0.5的区域是静态的
+    # 这里z轴向下，所以是gaussians.get_xyz[:, 2] < -0.5
+    # we supppose area with altitude>0.5 is static
+    # here z axis is downward so is gaussians.get_xyz[:, 2] < -0.5
+    # high_mask = pc.get_xyz[:, 2] < 0
+    # # import pdb;pdb.set_trace()
+    # mask = (pc.get_scaling_t[:, 0] > 0.2) | high_mask
     # 预过滤 - 过滤掉不可见或边际时间太小的点
     if mask is None:
         mask = marginal_t[:, 0] > 0.05  # 基于边际时间的默认遮罩
     else:
-        mask = mask & (marginal_t[:, 0] > 0.05)  # 与提供的遮罩结合
+        mask = mask & (marginal_t[:, 0] > 0.05)  # 与提供的遮罩结合 
+
+    #反转
+    # mask = ~mask
     # 计算点在相机坐标系中的位置和深度
     pts_in_cam = (
         means3D @ viewpoint_camera.world_view_transform[:3, :3]
@@ -236,63 +231,108 @@ def render_occ(
     features = torch.cat([features, depth_alpha, normals, local_distance.unsqueeze(-1)], dim=1)
 
     # 栅格化可见的高斯散点到图像，获得它们在屏幕上的半径
-    # contrib, rendered_image, rendered_feature, radii = rasterizer(
-    #     means3D=means3D,              # 3D中心点位置
-    #     means2D=means2D,              # 2D屏幕空间位置
-    #     shs=shs,                      # 球谐函数系数
-    #     colors_precomp=colors_precomp, # 预计算颜色
-    #     features=features,            # 特征向量
-    #     opacities=opacity,            # 不透明度
-    #     scales=scales,                # 尺度
-    #     rotations=rotations,          # 旋转
-    #     cov3D_precomp=cov3D_precomp, # 预计算协方差
-    #     mask=mask,                    # 可见性遮罩
-    # )
-
-    N = means3D.shape[0]
-    albedo = torch.ones(N, 3, device=means3D.device, dtype=means3D.dtype) 
-    roughness= torch.ones(N, 1, device=means3D.device, dtype=means3D.dtype)
-    metallic = torch.ones(N, 1, device=means3D.device, dtype=means3D.dtype) 
-
-    #预定义太阳方向
-    sun_dir = torch.tensor([0.34563615918159485, -0.138798788189888, 0.928046703338623], device=means3D.device, dtype=means3D.dtype)
-    # sun_dir = env_map.get_sun_direction()  #sun direction: [-0.34563615918159485, -0.138798788189888, -0.928046703338623]
-    sun_dir = sun_dir / sun_dir.norm()
-    # Rasterize visible Gaussians to image, obtain their radii (on screen).
-    (
-        rendered_image,
-        radii,
-        opacity_map,
-        depth_map,
-        normal_map_from_depth,
-        normal_map,
-        occlusion_map,
-        albedo_map,
-        roughness_map,
-        metallic_map,
-        out_normal_view,
-        depth_pos,
-        sun_shadow_map
-    ) = rasterizer(
-        means3D=means3D,
-        means2D=means2D,
-        opacities=opacity,
-        normal=normal_global,
-        shs=shs,
-        colors_precomp=colors_precomp,
-        albedo=albedo,
-        roughness=roughness,
-        metallic=metallic,
-        scales=scales,
-        rotations=rotations,
-        cov3D_precomp=cov3D_precomp,
+            # return contrib, rendered_image, rendered_feature, radii, \
+                # normal_from_depth, occlusion, sunshadow
+    
+        #预定义太阳方向
+    #sun_dir = torch.tensor([0.34563615918159485, -0.138798788189888, 0.928046703338623], device=means3D.device, dtype=means3D.dtype)
+    sun_dir = env_map.get_sun_direction()  #sun direction: [-0.34563615918159485, -0.138798788189888, -0.928046703338623]
+    #sun_dir = sun_dir / sun_dir.norm()  # 归一化太阳方向向量
+    # contrib, rendered_image, rendered_feature, radii, normal_from_depth, occlusion, sunshadow
+    contrib, rendered_image, rendered_feature, radii= rasterizer(
+        means3D=means3D,              # 3D中心点位置
+        means2D=means2D,              # 2D屏幕空间位置
+        shs=shs,                      # 球谐函数系数
+        colors_precomp=colors_precomp, # 预计算颜色
+        features=features,            # 特征向量
+        opacities=opacity,            # 不透明度
+        scales=scales,                # 尺度
+        rotations=rotations,          # 旋转
+        cov3D_precomp=cov3D_precomp, # 预计算协方差
+        mask=mask,                    # 可见性遮罩
         derive_normal=True,
         sun_dir=sun_dir
     )
 
+    # 分离渲染的特征图
+    rendered_other, rendered_depth, rendered_opacity, rendered_normal, rendered_distance = (
+        rendered_feature.split([S_other, 1, 1, 3, 1], dim=0)
+    )
+
+
+    ###############################################################
+    derive_normal = True
+    if derive_normal:
+        focal_x = raster_settings.image_width / (2.0 * raster_settings.tanfovx)
+        focal_y = raster_settings.image_height / (2.0 * raster_settings.tanfovy)
+        depth_filter = kornia.filters.median_blur(rendered_depth[None, ...], (3, 3))[0]
+
+        normal_from_depth, depth_pos = depth_to_normal(
+            raster_settings.image_width,
+            raster_settings.image_height,
+            focal_x,
+            focal_y,
+            raster_settings.viewmatrix,
+            depth_filter)
+    else:
+        normal_from_depth = torch.zeros_like(rendered_normal)
+        depth_pos = torch.zeros_like(rendered_normal)
+
+    normal_from_depth = kornia.filters.bilateral_blur(normal_from_depth[None, ...], (3, 3), 1, (3, 3))[0]
+    focal_x = raster_settings.image_width / (2.0 * raster_settings.tanfovx)
+    focal_y = raster_settings.image_height / (2.0 * raster_settings.tanfovy)
+
+    radius = raster_settings.radius
+    bias = raster_settings.bias
+    thick = raster_settings.thick
+    delta = raster_settings.delta
+    step = raster_settings.step
+    start = raster_settings.start
+
+    depth_pos_filter = kornia.filters.median_blur(depth_pos[None, ...], (3, 3))[0]
+    occlusion = SSAO(
+        raster_settings.image_width,
+        raster_settings.image_height,
+        focal_x,
+        focal_y,
+        radius,
+        bias,
+        thick,
+        delta,
+        step,
+        start,
+        # out_normal_view,
+        rendered_normal,
+        depth_pos_filter)
+    sunshadow = SunShadow(
+            raster_settings.image_width,
+            raster_settings.image_height,
+            focal_x,
+            focal_y,
+            radius,
+            bias,
+            thick,
+            delta,
+            step,
+            start,
+            sun_dir, #太阳方向
+            rendered_normal,
+        depth_pos_filter)
+            # occlusion = kornia.filters.median_blur(occlusion[None, ...], (5, 5))[0]
+        # shadow: [1, H, W]
+    shadow = sunshadow.unsqueeze(0)   # -> [1, 1, H, W]  (加 batch 维度)
+    # 或者如果本来就是 torch.Tensor([1,H,W]) 就写 shadow = shadow.unsqueeze(1)
+    # 去掉锯齿
+    shadow_clean = kornia.filters.median_blur(shadow, (3,3))   # [1,1,H,W]
+    # 模拟软阴影
+    #shadow_soft = kornia.filters.gaussian_blur2d(shadow_clean, (7,7), (3,3))  # [1,1,H,W]
+    # 如果你要恢复成 [1,H,W]
+    sunshadow = shadow_clean.squeeze(1)
+    ###############################################################
+
     # 将法向量从[-1, 1]范围映射到[0, 1]用于可视化
     # rendered_normal = F.normalize(rendered_normal, dim=0)
-    rendered_normal = normal_map * 0.5 + 0.5  # [-1, 1] -> [0, 1]
+    rendered_normal = rendered_normal * 0.5 + 0.5  # [-1, 1] -> [0, 1]
     
     rendered_image_before = rendered_image  # 保存环境光照前的图像
     # 如果有环境光照贴图，混合背景颜色
@@ -302,25 +342,38 @@ def render_occ(
             viewpoint_camera.get_world_directions(is_training).permute(1, 2, 0)
         ).permute(2, 0, 1)
         # 根据不透明度混合前景和背景
-        rendered_image = rendered_image + (1 - opacity_map) * bg_color_from_envmap
+        rendered_image = rendered_image + (1 - rendered_opacity) * bg_color_from_envmap
 
-    return {
-        "render": rendered_image,
-        "viewspace_points": screenspace_points,
-        "visibility_filter": radii > 0,
-        "radii": radii,
-        "opacity_map": opacity_map,
-        "depth_map": depth_map,
-        "normal_map_from_depth": normal_map_from_depth,
-        "normal_map": normal_map,
-        "albedo_map": albedo_map,
-        "roughness_map": roughness_map,
-        "metallic_map": metallic_map,
-        "occlusion_map": occlusion_map,
-        "sun_shadow_map": sun_shadow_map,
-        "out_normal_view": out_normal_view,
-        "depth_pos": depth_pos
+    # 构建返回字典，包含所有渲染结果
+    return_dict = {
+        "render": rendered_image,           # 最终渲染图像
+        "render_nobg": rendered_image_before, # 无背景的渲染图像
+        "viewspace_points": screenspace_points, # 屏幕空间点坐标
+        "visibility_filter": radii > 0,     # 可见性过滤器（半径大于0的点）
+        "radii": radii,                     # 屏幕空间半径
+        "contrib": contrib,                 # 每个点的贡献度
+        "depth": rendered_depth,            # 渲染深度图
+        "alpha": rendered_opacity,          # 渲染不透明度图
+        "normal": rendered_normal,          # 渲染法向量图
+        "feature": rendered_other,          # 其他特征图
+        "scaling": scales,                  # 尺度参数
+        "rendered_distance": rendered_distance, # 渲染距离图，
+        "occlusion_map": occlusion,
+        "sun_shadow_map": sunshadow,
     }
+
+    # 如果需要返回深度法向量
+    if return_depth_normal:
+        # 从深度图计算法向量（基于深度梯度）
+        depth_normal = (
+            render_normal(viewpoint_camera, rendered_depth.squeeze())
+            * (rendered_opacity).detach()  # 用不透明度加权
+        )
+        return_dict.update({"depth_normal": depth_normal * 0.5 + 0.5})
+    
+    # 那些被视锥剔除或半径为0的高斯点是不可见的
+    # 它们将被排除在用于分割标准的值更新之外
+    return return_dict
 
 
 def calculate_loss(
@@ -746,14 +799,18 @@ def calculate_loss(
                             + offsets.float()
                         )
 
+                        # 从参考帧采样灰度值
                         H, W = gt_image_gray.squeeze().shape
                         pixels_patch = ori_pixels_patch.clone()
+                        # 归一化到[-1, 1]范围用于grid_sample
                         pixels_patch[:, :, 0] = (
                             2 * pixels_patch[:, :, 0] / (W - 1) - 1.0
                         )
                         pixels_patch[:, :, 1] = (
                             2 * pixels_patch[:, :, 1] / (H - 1) - 1.0
                         )
+                        
+                        # 使用双线性插值采样参考帧的灰度补丁
                         ref_gray_val = F.grid_sample(
                             gt_image_gray.unsqueeze(1),
                             pixels_patch.view(1, -1, 1, 2),
@@ -761,6 +818,7 @@ def calculate_loss(
                         )
                         ref_gray_val = ref_gray_val.reshape(-1, total_patch_size)
 
+                        # 计算从参考相机到最近相机的变换
                         ref_to_neareast_r = (
                             nearest_cam.world_view_transform[:3, :3].transpose(-1, -2)
                             @ viewpoint_camera.world_view_transform[:3, :3]
@@ -771,14 +829,15 @@ def calculate_loss(
                             + nearest_cam.world_view_transform[3, :3]
                         )
 
-                    ## compute Homography
-                    ref_local_n = render_pkg["normal"].permute(1, 2, 0) # (H, W, 3) [0, 1]
-                    ref_local_n = ref_local_n * 2.0 - 1.0
+                    ## 计算单应性矩阵（Homography）
+                    ref_local_n = render_pkg["normal"].permute(1, 2, 0) # 法向量 (H, W, 3) [0, 1]
+                    ref_local_n = ref_local_n * 2.0 - 1.0  # 转换到[-1, 1]范围
                     ref_local_n = ref_local_n.reshape(-1, 3)[valid_indices]
 
-                    ref_local_d = render_pkg['rendered_distance'].squeeze()
-
+                    ref_local_d = render_pkg['rendered_distance'].squeeze()  # 距离图
                     ref_local_d = ref_local_d.reshape(-1)[valid_indices]
+                    
+                    # 计算平面到平面的单应性变换矩阵
                     H_ref_to_neareast = (
                         ref_to_neareast_r[None]
                         - torch.matmul(
@@ -791,6 +850,8 @@ def calculate_loss(
                         )
                         / ref_local_d[..., None, None]
                     )
+                    
+                    # 应用相机内参变换
                     H_ref_to_neareast = torch.matmul(
                         nearest_cam.get_k(nearest_cam.ncc_scale)[None].expand(
                             ref_local_d.shape[0], 3, 3
@@ -801,12 +862,16 @@ def calculate_loss(
                         viewpoint_camera.ncc_scale
                     )
 
-                    ## compute neareast frame patch
+                    ## 计算最近帧的对应补丁
+                    # 使用单应性变换对补丁进行几何变形
                     grid = patch_warp(
                         H_ref_to_neareast.reshape(-1, 3, 3), ori_pixels_patch
                     )
+                    # 归一化到[-1, 1]范围用于grid_sample
                     grid[:, :, 0] = 2 * grid[:, :, 0] / (W - 1) - 1.0
                     grid[:, :, 1] = 2 * grid[:, :, 1] / (H - 1) - 1.0
+                    
+                    # 从最近帧采样对应的灰度补丁
                     _, nearest_image_gray = nearest_cam.get_image()
                     sampled_gray_val = F.grid_sample(
                         nearest_image_gray[None],
@@ -815,52 +880,83 @@ def calculate_loss(
                     )
                     sampled_gray_val = sampled_gray_val.reshape(-1, total_patch_size)
 
-                    ## compute loss
+                    ## 计算归一化互相关（NCC）损失
                     ncc, ncc_mask = lncc(ref_gray_val, sampled_gray_val)
                     mask = ncc_mask.reshape(-1)
-                    ncc = ncc.reshape(-1) * weights
+                    ncc = ncc.reshape(-1) * weights  # 用几何权重加权
                     ncc = ncc[mask].squeeze()
 
+                    # 如果有有效的NCC值，添加到损失中
                     if mask.sum() > 0:
                         ncc_loss = ncc_weight * ncc.mean()
                         loss += ncc_loss
 
     
-    extra_render_pkg["t_map"] = t_map
-    extra_render_pkg["v_map"] = v_map
-    extra_render_pkg["depth"] = depth
+    # 收集额外的渲染信息用于可视化和分析
+    extra_render_pkg["t_map"] = t_map          # 时间图
+    extra_render_pkg["v_map"] = v_map          # 速度图
+    extra_render_pkg["depth"] = depth          # 深度图
 
-    extra_render_pkg["dynamic_mask"] = loss_mult
-    extra_render_pkg["dino_cosine"] = dino_part
+    extra_render_pkg["dynamic_mask"] = loss_mult    # 动态遮罩
+    extra_render_pkg["dino_cosine"] = dino_part     # DINO余弦相似度
 
+    # 更新日志字典
     log_dict.update(metrics)
 
     return loss, log_dict, extra_render_pkg
 
 
-def render_occ_wrapper(
-    args,
-    viewpoint_camera: Camera,
-    gaussians: GaussianModel,
-    background: torch.Tensor,
-    time_interval: float,
-    env_map,
-    iterations,
-    camera_id,
-    nearest_cam: Camera = None,
+def render_shadow_wrapper(
+    args,                          # 训练参数配置
+    viewpoint_camera: Camera,      # 视点相机
+    gaussians: GaussianModel,      # 高斯散点模型
+    background: torch.Tensor,      # 背景颜色
+    time_interval: float,          # 时间间隔
+    env_map,                       # 环境光照贴图
+    iterations,                    # 当前迭代次数
+    camera_id,                     # 相机ID
+    nearest_cam: Camera = None,    # 最近的相机
 ):
+    """
+    PVG渲染包装函数
+    
+    封装了渲染和损失计算的完整流程，包括：
+    1. 准备动态特征（速度和时间尺度）
+    2. 可选的时间偏移用于自监督
+    3. 调用渲染函数
+    4. 计算损失
+    
+    参数:
+        args: 包含各种配置参数的对象
+        viewpoint_camera: 当前视点相机
+        gaussians: 高斯散点模型
+        background: 背景颜色张量
+        time_interval: 时间间隔，用于动态场景
+        env_map: 环境光照贴图
+        iterations: 当前训练迭代次数
+        camera_id: 相机标识符
+        nearest_cam: 用于多视角一致性的最近相机
+        
+    返回:
+        loss: 总损失值
+        log_dict: 各项损失的记录字典
+        render_pkg: 完整的渲染结果包
+    """
 
-    # render v and t scale map
-    v = gaussians.get_inst_velocity
-    t_scale = gaussians.get_scaling_t.clamp_max(2)
-    other = [t_scale, v]
+    # 准备动态特征：速度和时间尺度
+    v = gaussians.get_inst_velocity              # 瞬时速度
+    t_scale = gaussians.get_scaling_t.clamp_max(2)  # 时间尺度（限制最大值为2）
+    other = [t_scale, v]  # 其他特征列表
 
+    # 随机时间偏移用于自监督学习（增强时间一致性）
     if np.random.random() < args.lambda_self_supervision:
+        # 在时间间隔的±1.5倍范围内随机偏移
         time_shift = 3 * (np.random.random() - 0.5) * time_interval
     else:
         time_shift = None
 
-    render_pkg = render_occ(
+    # 执行PVG渲染
+    render_pkg = render_shadow(
         viewpoint_camera,
         gaussians,
         args,
@@ -870,35 +966,23 @@ def render_occ_wrapper(
         time_shift=time_shift,
         is_training=True,
     )
+    
+    # 可选的静态场景渲染（用于对比分析）
     # if iterations > args.uncertainty_warmup_start:
-    #     # we supppose area with altitude>0.5 is static
-    #     # here z axis is downward so is gaussians.get_xyz[:, 2] < -0.5
+    #     # 我们假设海拔>0.5的区域是静态的
+    #     # 这里z轴向下，所以是gaussians.get_xyz[:, 2] < -0.5
     #     high_mask = gaussians.get_xyz[:, 2] < -0.5
     #     # import pdb;pdb.set_trace()
     #     static_mask = (gaussians.get_scaling_t[:, 0] > args.separate_scaling_t) | high_mask
-    #     static_render_package = render_occ(viewpoint_camera, gaussians, args, background, env_map=env_map, mask=static_mask)
-    #     static_image = static_render_package['render']
+    #     static_image = render_pvg(viewpoint_camera, gaussians, args, background, env_map=env_map, mask=static_mask)['render']
     #     render_pkg['static_image'] = static_image
-    #     render_pkg['static_occlusion'] = static_render_package['occlusion_map']
-    #     render_pkg['static_sun_shadow'] = static_render_package['sun_shadow_map']
 
-    # loss, log_dict, extra_render_pkg = calculate_loss(
-    #     gaussians, viewpoint_camera, background, args, render_pkg, env_map, iterations, camera_id, nearest_cam=nearest_cam,
-    # )
+    # 计算损失
+    loss, log_dict, extra_render_pkg = calculate_loss(
+        gaussians, viewpoint_camera, background, args, render_pkg, env_map, iterations, camera_id, nearest_cam=nearest_cam,
+    )
 
-    #render_pkg.update(extra_render_pkg)
+    # 合并额外的渲染信息
+    render_pkg.update(extra_render_pkg)
 
-
-    # we supppose area with altitude>0.5 is static
-    # here z axis is downward so is gaussians.get_xyz[:, 2] < -0.5
-    high_mask = gaussians.get_xyz[:, 2] < -0.5
-    # import pdb;pdb.set_trace()
-    static_mask = (gaussians.get_scaling_t[:, 0] > args.separate_scaling_t) | high_mask
-    static_render_package = render_occ(viewpoint_camera, gaussians, args, background, env_map=env_map, mask=static_mask)
-    static_image = static_render_package['render']
-    render_pkg['static_image'] = static_image
-    render_pkg['static_occlusion'] = static_render_package['occlusion_map']
-    render_pkg['static_sun_shadow'] = static_render_package['sun_shadow_map']
-    loss = None
-    log_dict = {}
     return loss, log_dict, render_pkg

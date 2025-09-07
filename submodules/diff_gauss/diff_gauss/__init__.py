@@ -536,6 +536,18 @@ class GaussianRasterizer(nn.Module):
             out_normal_view,
             depth_pos_filter)
             # occlusion = kornia.filters.median_blur(occlusion[None, ...], (5, 5))[0]
+        # shadow: [1, H, W]
+        shadow = sunshadow.unsqueeze(0)   # -> [1, 1, H, W]  (加 batch 维度)
+        # 或者如果本来就是 torch.Tensor([1,H,W]) 就写 shadow = shadow.unsqueeze(1)
+
+        # 去掉锯齿
+        shadow_clean = kornia.filters.median_blur(shadow, (3,3))   # [1,1,H,W]
+
+        # 模拟软阴影
+        #shadow_soft = kornia.filters.gaussian_blur2d(shadow_clean, (7,7), (3,3))  # [1,1,H,W]
+
+        # 如果你要恢复成 [1,H,W]
+        sunshadow = shadow_clean.squeeze(1)
         # else:
             # occlusion = torch.zeros_like(depth)
 

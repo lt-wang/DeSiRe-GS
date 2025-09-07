@@ -211,6 +211,8 @@ class UncertaintyModel(nn.Module):
             get_intermediate_layers,
             original_model
         )
+        # Load from cache first, don't force reload
+        # fine_model = torch.hub.load("ywyue/FiT3D", "dinov2_reg_small_fine", force_reload=False)
         fine_model = torch.hub.load("ywyue/FiT3D", "dinov2_reg_small_fine")
         fine_model.get_intermediate_layers = types.MethodType(
             get_intermediate_layers,

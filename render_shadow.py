@@ -27,7 +27,7 @@ from texttable import Texttable
 import cv2
 import numpy as np
 import warnings
-
+from gaussian_renderer import render_shadow, render_shadow_wrapper
 
 warnings.filterwarnings("ignore")
 EPS = 1e-5
@@ -69,7 +69,6 @@ def render_sets(iteration, scene : Scene, renderFunc, renderArgs, env_map=None):
             depth_normal_path = os.path.join(args.model_path, "render_result", "depth_normal")
             img_path = os.path.join(args.model_path, "render_result", "image")
             dynamic_path = os.path.join(args.model_path, "render_result", "dynamic_mask")
-            
             os.makedirs(outdir,exist_ok=True)
             os.makedirs(image_folder,exist_ok=True)
             os.makedirs(dynamic_path, exist_ok=True)
@@ -126,6 +125,8 @@ def render_sets(iteration, scene : Scene, renderFunc, renderArgs, env_map=None):
                 #         dynamic_mask.float().repeat(3, 1, 1),
                 #         ~(dynamic_mask>0)*image,
                 #         ]
+                occlusion = render_pkg["occlusion_map"]
+                sun_shadow = render_pkg["sun_shadow_map"]
                 grid = [image, alpha, depth, gt_image, pseudo_normal, 
                         torch.logical_not(sky_mask[:1]).float().repeat(3, 1, 1),
                         ~(dynamic_mask>0)*depth,
@@ -141,6 +142,9 @@ def render_sets(iteration, scene : Scene, renderFunc, renderArgs, env_map=None):
                 #     pseudo_normal,
                 #     viewpoint.normal_map.cuda()
                 # ], nrow=6)
+                all_shadow = [occlusion, sun_shadow]
+                all_shadow = make_grid(all_shadow, nrow=2)
+                save_image(all_shadow,os.path.join(outdir, f"{viewpoint.colmap_id:03d}_shadow.png"))
                 save_image(grid, os.path.join(outdir, f"{viewpoint.colmap_id:03d}.png"))
                 cv2.imwrite(os.path.join(img_path, f"{viewpoint.colmap_id:03d}_render.png"), (image[[2,1,0], :, :].permute(1, 2, 0).cpu().numpy() * 255).astype(np.uint8))
 
@@ -202,6 +206,6 @@ if __name__ == "__main__":
     bg_color = [1, 1, 1] if args.white_background else [0, 0, 0]
     background = torch.tensor(bg_color, dtype=torch.float32, device="cuda")
     render_func, render_wrapper = get_renderer(args.render_type)
-    render_sets(first_iter, scene, render_wrapper, (args, background), env_map=env_map)
+    render_sets(first_iter, scene, render_shadow_wrapper, (args, background), env_map=env_map)
 
     print("render_sets complete.")

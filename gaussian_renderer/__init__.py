@@ -12,6 +12,7 @@
 from .gs_render import render_original_gs, render_gs_origin_wrapper
 from .pvg_render import render_pvg, render_pvg_wrapper
 from .occ_render import render_occ, render_occ_wrapper
+from .shadow_render import render_shadow, render_shadow_wrapper
 EPS = 1e-5
 
 rendererTypeCallbacks = {

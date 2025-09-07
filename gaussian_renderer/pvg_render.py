@@ -48,7 +48,7 @@ def render_pvg(
     other=[],                      # 其他特征
     mask=None,                     # 遮罩
     is_training=False,             # 是否为训练模式
-    return_depth_normal=False,     # 是否返回深度法向量
+    return_depth_normal=True,     # 是否返回深度法向量
 ):
     """
     PVG渲染主函数 - 渲染动态高斯散点场景
@@ -177,11 +177,21 @@ def render_pvg(
         features = torch.zeros_like(means3D[:, :0])  # 空特征张量
         S_other = 0
 
+        # 我们假设海拔>0.5的区域是静态的
+    # 这里z轴向下，所以是gaussians.get_xyz[:, 2] < -0.5
+    # we supppose area with altitude>0.5 is static
+    # here z axis is downward so is gaussians.get_xyz[:, 2] < -0.5
+    # high_mask = pc.get_xyz[:, 2] < 0
+    # # import pdb;pdb.set_trace()
+    # mask = (pc.get_scaling_t[:, 0] > 0.2) | high_mask
     # 预过滤 - 过滤掉不可见或边际时间太小的点
     if mask is None:
         mask = marginal_t[:, 0] > 0.05  # 基于边际时间的默认遮罩
     else:
-        mask = mask & (marginal_t[:, 0] > 0.05)  # 与提供的遮罩结合
+        mask = mask & (marginal_t[:, 0] > 0.05)  # 与提供的遮罩结合 
+
+    #反转
+    # mask = ~mask
     # 计算点在相机坐标系中的位置和深度
     pts_in_cam = (
         means3D @ viewpoint_camera.world_view_transform[:3, :3]
